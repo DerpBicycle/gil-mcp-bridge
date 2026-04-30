@@ -1,4 +1,4 @@
-# @gameindustrylibrary/mcp
+# gil-mcp-bridge
 
 Stdio bridge for the **Game Industry Library MCP server**. Exposes the remote `/api/mcp` endpoint to MCP clients that only speak stdio (older Claude Desktop, Cline, Continue, custom integrations).
 
@@ -6,17 +6,25 @@ If your MCP client supports remote/HTTP transport (Claude Desktop ≥ 1.x, Claud
 
 ## Install
 
-No install needed — use `npx`:
+Run directly from GitHub via `npx` — no install needed:
 
 ```bash
-npx @gameindustrylibrary/mcp
+npx github:DerpBicycle/gil-mcp-bridge
 ```
 
-Or install globally:
+Or pin a specific commit / tag:
 
 ```bash
-npm install -g @gameindustrylibrary/mcp
-gil-mcp
+npx github:DerpBicycle/gil-mcp-bridge#v0.1.0
+```
+
+Or clone + install:
+
+```bash
+git clone https://github.com/DerpBicycle/gil-mcp-bridge
+cd gil-mcp-bridge
+npm install   # runs prepare → tsc, then dist/ is ready
+node dist/index.js
 ```
 
 ## Authentication
@@ -26,7 +34,7 @@ Two options:
 ### OAuth (recommended)
 
 ```bash
-npx @gameindustrylibrary/mcp login
+npx github:DerpBicycle/gil-mcp-bridge login
 ```
 
 This opens your browser, registers a client via DCR, walks you through the consent screen, and stores tokens at `~/.gil/credentials.json` (mode 0600, user-only). Refresh happens automatically — your session stays valid for 30 days unless you revoke it from `/account → Connected Apps`.
@@ -34,7 +42,7 @@ This opens your browser, registers a client via DCR, walks you through the conse
 ### Legacy API key
 
 ```bash
-GIL_API_KEY=gil_xxx npx @gameindustrylibrary/mcp
+GIL_API_KEY=gil_xxx npx github:DerpBicycle/gil-mcp-bridge
 ```
 
 Get a key from [/help/mcp-server](https://gameindustrylibrary.com/help/mcp-server) (logged in). Bearer keys don't expire but you can revoke them from the same page.
@@ -50,17 +58,17 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
   "mcpServers": {
     "game-industry-library": {
       "command": "npx",
-      "args": ["@gameindustrylibrary/mcp"]
+      "args": ["github:DerpBicycle/gil-mcp-bridge"]
     }
   }
 }
 ```
 
-Restart Claude Desktop. On first run, the bridge will print a "no credentials" error — run `npx @gameindustrylibrary/mcp login` once to authenticate.
+Restart Claude Desktop. On first run, the bridge will print a "no credentials" error — run `npx github:DerpBicycle/gil-mcp-bridge login` once to authenticate.
 
 ### Cline / Continue / other VS Code clients
 
-Same config — point the client at `npx @gameindustrylibrary/mcp` as the command.
+Same config — point the client at `npx github:DerpBicycle/gil-mcp-bridge` as the command.
 
 ### Custom
 

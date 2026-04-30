@@ -1,6 +1,9 @@
 node_modules/
-dist/
 *.tsbuildinfo
 .DS_Store
 .env
 .env.local
+
+# dist/ is intentionally committed so `npx github:DerpBicycle/gil-mcp-bridge`
+# runs without needing to compile TypeScript first. Re-build with `npm run build`
+# whenever src/ changes.
