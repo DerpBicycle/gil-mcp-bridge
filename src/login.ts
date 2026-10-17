@@ -13,6 +13,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
+import { hostname } from 'node:os';
 import { saveCredentials, getBaseUrl, type Credentials } from './credentials.js';
 
 const LOOPBACK_PORT = 33418;
@@ -29,20 +30,53 @@ function pkcePair(): PkcePair {
   return { verifier, challenge };
 }
 
+/** The Game Industry Library mark (the site's icon.svg, also in assets/logo.svg). */
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="48" height="48" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#18181b"/><rect x="4.25" y="10" width="5" height="15" rx="1.2" fill="#fafafa"/><rect x="11.75" y="6" width="5" height="19" rx="1.2" fill="#34d399"/><rect x="19.75" y="12" width="5" height="13" rx="1.2" fill="#fafafa" transform="rotate(14 19.75 25)"/></svg>`;
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}
+
+/** The page the browser lands on after the consent screen. `body` is trusted HTML. */
+function callbackPage(title: string, body: string): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)} · Game Industry Library</title>
+<style>
+:root{color-scheme:light dark;--bg:#fafafa;--fg:#09090b;--muted:#52525b;--accent:#059669}
+@media (prefers-color-scheme:dark){:root{--bg:#09090b;--fg:#fafafa;--muted:#a1a1aa;--accent:#34d399}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,sans-serif}
+main{max-width:520px;margin:12vh auto;padding:0 16px}
+.brand{display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:-.01em;font-size:18px}
+.brand span{color:var(--accent)}
+h1{font-size:24px;margin:32px 0 8px}
+p{color:var(--muted);margin:0 0 12px}
+a{color:var(--accent)}
+</style></head><body><main>
+<div class="brand">${LOGO_SVG}<div>Game Industry <span>Library</span></div></div>
+<h1>${escapeHtml(title)}</h1>
+${body}
+</main></body></html>`;
+}
+
 function openBrowser(url: string): void {
-  const platform = process.platform;
-  const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open';
-  const child = spawn(cmd, [url], { detached: true, stdio: 'ignore' });
+  // `start` is a cmd.exe builtin, not a program; its first quoted argument is a window title.
+  const [cmd, args] =
+    process.platform === 'darwin'
+      ? ['open', [url]]
+      : process.platform === 'win32'
+        ? ['cmd', ['/c', 'start', '""', url]]
+        : ['xdg-open', [url]];
+  const child = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+  child.on('error', () => {}); // no browser opener — the URL is printed anyway
   child.unref();
 }
 
 async function registerClient(baseUrl: string): Promise<string> {
-  const hostname = process.env.HOSTNAME || 'unknown-host';
   const res = await fetch(`${baseUrl}/oauth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      client_name: `gil-mcp on ${hostname}`,
+      client_name: `gil-mcp-bridge on ${hostname()}`,
       redirect_uris: [REDIRECT_URI],
     }),
   });
@@ -56,6 +90,15 @@ async function registerClient(baseUrl: string): Promise<string> {
 
 async function awaitRedirect(): Promise<{ code: string; state: string }> {
   return new Promise((resolve, reject) => {
+    // Settles the promise once and frees the port and the timer, so the process
+    // exits as soon as login is done instead of waiting out the timeout.
+    const finish = (err: Error | null, result?: { code: string; state: string }) => {
+      clearTimeout(timeout);
+      server.close();
+      if (err) reject(err);
+      else resolve(result!);
+    };
+
     const server = createServer((req, res) => {
       if (!req.url?.startsWith('/cb')) {
         res.writeHead(404).end();
@@ -67,34 +110,39 @@ async function awaitRedirect(): Promise<{ code: string; state: string }> {
       const error = url.searchParams.get('error');
 
       if (error) {
-        res.writeHead(400, { 'Content-Type': 'text/html' });
-        res.end(`<html><body style="font-family:system-ui;padding:2rem"><h1>Authorization failed</h1><p>${error}</p><p>You can close this tab.</p></body></html>`);
-        server.close();
-        reject(new Error(`OAuth error: ${error}`));
+        // The server explains a refusal here — e.g. that MCP needs a Pro subscription.
+        const description = url.searchParams.get('error_description');
+        const reason = description ? `${description} (${error})` : error;
+        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(
+          callbackPage(
+            'Authorization failed',
+            `<p>${escapeHtml(reason)}</p><p>You can close this tab.</p>`,
+          ),
+        );
+        finish(new Error(`OAuth error: ${reason}`));
         return;
       }
 
       if (!code || !state) {
-        res.writeHead(400, { 'Content-Type': 'text/html' });
-        res.end(`<html><body style="font-family:system-ui;padding:2rem"><h1>Missing code or state</h1></body></html>`);
-        server.close();
-        reject(new Error('Missing code or state in callback'));
+        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(callbackPage('Missing code or state', '<p>You can close this tab and try again.</p>'));
+        finish(new Error('Missing code or state in callback'));
         return;
       }
 
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<html><body style="font-family:system-ui;padding:2rem;max-width:560px"><h1>✅ Connected</h1><p>You can close this tab and return to your terminal.</p></body></html>`);
-      server.close();
-      resolve({ code, state });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(
+        callbackPage('Connected', '<p>You can close this tab and return to your terminal.</p>'),
+      );
+      finish(null, { code, state });
     });
 
-    server.on('error', reject);
+    server.on('error', (err) => finish(err));
     server.listen(LOOPBACK_PORT, '127.0.0.1');
 
-    // Timeout after 5 minutes
-    setTimeout(() => {
-      server.close();
-      reject(new Error('OAuth flow timed out — no redirect received within 5 minutes'));
+    const timeout = setTimeout(() => {
+      finish(new Error('OAuth flow timed out — no redirect received within 5 minutes'));
     }, 5 * 60_000);
   });
 }
@@ -168,4 +216,5 @@ export async function runLogin(): Promise<void> {
 
   process.stderr.write(`✅ Logged in. Credentials saved to ~/.gil/credentials.json.\n`);
   process.stderr.write(`Run 'gil-mcp' (no args) to start the bridge.\n`);
+  process.stderr.write(`Tool calls need a Game Industry Library Pro subscription: ${baseUrl}/subscribe\n`);
 }

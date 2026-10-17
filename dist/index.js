@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @gameindustrylibrary/mcp — stdio bridge for the GIL MCP server.
+ * gil-mcp-bridge — stdio bridge for the GIL MCP server.
  *
  * Forwards JSON-RPC frames on stdin to https://gameindustrylibrary.com/api/mcp
  * with a Bearer token, and writes the responses back to stdout. Dom met opzet —
@@ -15,6 +15,9 @@
  * Environment variables:
  *   GIL_API_KEY    Legacy API key (gil_xxx). Takes precedence over stored OAuth tokens.
  *   GIL_BASE_URL   Override server URL (default: https://gameindustrylibrary.com)
+ *
+ * The MCP server is part of Game Industry Library Pro: tool calls without an
+ * active subscription come back as a JSON-RPC error that says so.
  */
 import { runBridge } from './bridge.js';
 import { runLogin } from './login.js';
@@ -67,6 +70,7 @@ Environment:
   GIL_API_KEY            Legacy API key (gil_xxx) — alternative to OAuth login
   GIL_BASE_URL           Override server URL (default: https://gameindustrylibrary.com)
 
+Requires a Game Industry Library Pro subscription: https://gameindustrylibrary.com/subscribe
 Docs: https://gameindustrylibrary.com/help/mcp-server
 `);
 }

@@ -69,19 +69,36 @@ export async function refreshAccessToken(creds) {
     return updated;
 }
 /**
- * Get a valid access token, refreshing if needed.
+ * Refreshes in flight, so concurrent requests share one. The server rotates the
+ * refresh token on every use: a second refresh with the same token would fail
+ * and, worse, the first one's new pair would already have revoked it.
+ */
+let refreshing = null;
+function refreshOnce(creds) {
+    refreshing ??= refreshAccessToken(creds).finally(() => {
+        refreshing = null;
+    });
+    return refreshing;
+}
+/**
+ * Get a valid access token, refreshing if needed. `rejected` is a token the server
+ * just answered with 401 (revoked before its expiry): it is refreshed unless the
+ * stored token has already moved on, e.g. by a concurrent request's refresh.
  * Returns null if no credentials are stored or refresh failed.
  */
-export async function getValidAccessToken() {
+export async function getValidAccessToken(rejected) {
+    if (refreshing)
+        return (await refreshing)?.access_token ?? null;
     const creds = await loadCredentials();
     if (!creds)
         return null;
     const now = Math.floor(Date.now() / 1000);
     const skew = 60; // refresh 60s before expiry to avoid clock skew issues
-    if (creds.expires_at > now + skew) {
+    const stale = rejected !== undefined && creds.access_token === rejected;
+    if (!stale && creds.expires_at > now + skew) {
         return creds.access_token;
     }
-    const refreshed = await refreshAccessToken(creds);
+    const refreshed = await refreshOnce(creds);
     return refreshed?.access_token ?? null;
 }
 export async function statusCommand() {
@@ -102,10 +119,36 @@ export async function statusCommand() {
         `  access_token:  ${creds.access_token.slice(0, 14)}... (${expiresMsg})\n` +
         `  refresh_token: ${creds.refresh_token.slice(0, 14)}...\n`);
 }
+/**
+ * RFC 7009 revocation, best effort: logging out must work offline too, so a
+ * failure only means the server-side tokens expire on their own (1h / 30d).
+ */
+async function revokeToken(baseUrl, token) {
+    try {
+        const res = await fetch(`${baseUrl}/oauth/revoke`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ token }).toString(),
+        });
+        return res.ok;
+    }
+    catch {
+        return false;
+    }
+}
 export async function logoutCommand() {
-    const existed = await loadCredentials() !== null;
+    const creds = await loadCredentials();
+    if (creds) {
+        const revoked = await Promise.all([
+            revokeToken(creds.base_url, creds.refresh_token),
+            revokeToken(creds.base_url, creds.access_token),
+        ]);
+        if (!revoked.every(Boolean)) {
+            process.stderr.write(`Could not reach ${creds.base_url} to revoke the tokens — they expire on their own.\n`);
+        }
+    }
     await deleteCredentials();
-    if (existed) {
+    if (creds) {
         process.stderr.write(`Credentials removed.\n`);
     }
     else {

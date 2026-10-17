@@ -1,6 +1,6 @@
 {
   "name": "gil-mcp-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Stdio bridge for the Game Industry Library MCP server. Exposes the remote /api/mcp endpoint to MCP clients that only speak stdio (older Claude Desktop, Cline, etc.). Distributed via GitHub: install with `npx github:DerpBicycle/gil-mcp-bridge`.",
   "license": "MIT",
   "author": "Eric Diepeveen <mail@ericdiepeveen.com>",
@@ -16,6 +16,7 @@
   "main": "./dist/index.js",
   "files": [
     "dist",
+    "assets",
     "README.md",
     "LICENSE"
   ],

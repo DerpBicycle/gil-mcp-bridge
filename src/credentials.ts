@@ -90,20 +90,39 @@ export async function refreshAccessToken(creds: Credentials): Promise<Credential
 }
 
 /**
- * Get a valid access token, refreshing if needed.
+ * Refreshes in flight, so concurrent requests share one. The server rotates the
+ * refresh token on every use: a second refresh with the same token would fail
+ * and, worse, the first one's new pair would already have revoked it.
+ */
+let refreshing: Promise<Credentials | null> | null = null;
+
+function refreshOnce(creds: Credentials): Promise<Credentials | null> {
+  refreshing ??= refreshAccessToken(creds).finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+/**
+ * Get a valid access token, refreshing if needed. `rejected` is a token the server
+ * just answered with 401 (revoked before its expiry): it is refreshed unless the
+ * stored token has already moved on, e.g. by a concurrent request's refresh.
  * Returns null if no credentials are stored or refresh failed.
  */
-export async function getValidAccessToken(): Promise<string | null> {
+export async function getValidAccessToken(rejected?: string): Promise<string | null> {
+  if (refreshing) return (await refreshing)?.access_token ?? null;
+
   const creds = await loadCredentials();
   if (!creds) return null;
 
   const now = Math.floor(Date.now() / 1000);
   const skew = 60; // refresh 60s before expiry to avoid clock skew issues
-  if (creds.expires_at > now + skew) {
+  const stale = rejected !== undefined && creds.access_token === rejected;
+  if (!stale && creds.expires_at > now + skew) {
     return creds.access_token;
   }
 
-  const refreshed = await refreshAccessToken(creds);
+  const refreshed = await refreshOnce(creds);
   return refreshed?.access_token ?? null;
 }
 
@@ -128,10 +147,36 @@ export async function statusCommand(): Promise<void> {
   );
 }
 
+/**
+ * RFC 7009 revocation, best effort: logging out must work offline too, so a
+ * failure only means the server-side tokens expire on their own (1h / 30d).
+ */
+async function revokeToken(baseUrl: string, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${baseUrl}/oauth/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token }).toString(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function logoutCommand(): Promise<void> {
-  const existed = await loadCredentials() !== null;
+  const creds = await loadCredentials();
+  if (creds) {
+    const revoked = await Promise.all([
+      revokeToken(creds.base_url, creds.refresh_token),
+      revokeToken(creds.base_url, creds.access_token),
+    ]);
+    if (!revoked.every(Boolean)) {
+      process.stderr.write(`Could not reach ${creds.base_url} to revoke the tokens — they expire on their own.\n`);
+    }
+  }
   await deleteCredentials();
-  if (existed) {
+  if (creds) {
     process.stderr.write(`Credentials removed.\n`);
   } else {
     process.stderr.write(`No credentials to remove.\n`);
