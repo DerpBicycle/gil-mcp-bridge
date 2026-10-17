@@ -22,7 +22,7 @@ function pkcePair() {
     return { verifier, challenge };
 }
 /** The Game Industry Library mark (the site's icon.svg, also in assets/logo.svg). */
-const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="48" height="48" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#18181b"/><rect x="4.25" y="10" width="5" height="15" rx="1.2" fill="#fafafa"/><rect x="11.75" y="6" width="5" height="19" rx="1.2" fill="#34d399"/><rect x="19.75" y="12" width="5" height="13" rx="1.2" fill="#fafafa" transform="rotate(14 19.75 25)"/></svg>`;
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="48" height="48" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#021e31"/><rect x="4.25" y="10" width="5" height="15" rx="1.2" fill="#f9fafb"/><rect x="11.75" y="6" width="5" height="19" rx="1.2" fill="#34d399"/><rect x="19.75" y="12" width="5" height="13" rx="1.2" fill="#f9fafb" transform="rotate(14 19.75 25)"/></svg>`;
 function escapeHtml(text) {
     return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
@@ -31,8 +31,8 @@ function callbackPage(title, body) {
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)} · Game Industry Library</title>
 <style>
-:root{color-scheme:light dark;--bg:#fafafa;--fg:#09090b;--muted:#52525b;--accent:#059669}
-@media (prefers-color-scheme:dark){:root{--bg:#09090b;--fg:#fafafa;--muted:#a1a1aa;--accent:#34d399}}
+:root{color-scheme:light dark;--bg:#f9fafb;--fg:#001122;--muted:#435662;--accent:#059669}
+@media (prefers-color-scheme:dark){:root{--bg:#001122;--fg:#f9fafb;--muted:#95a2a9;--accent:#34d399}}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,sans-serif}
 main{max-width:520px;margin:12vh auto;padding:0 16px}
 .brand{display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:-.01em;font-size:18px}
