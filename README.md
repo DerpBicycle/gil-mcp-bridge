@@ -15,13 +15,15 @@ If your client takes a server address (remote MCP over HTTP — the Claude app a
 Run directly from GitHub via `npx` — no install needed:
 
 ```bash
-npx github:DerpBicycle/gil-mcp-bridge
+npx --yes --allow-git=root github:DerpBicycle/gil-mcp-bridge
 ```
+
+`--allow-git=root` is needed from npm 12 on, which refuses packages fetched from git unless allowed (`EALLOWGIT`). Older npm versions accept the flag too, so keep it in every command and config. `--yes` skips the install prompt.
 
 Or pin a specific commit / tag:
 
 ```bash
-npx github:DerpBicycle/gil-mcp-bridge#v0.2.0
+npx --yes --allow-git=root github:DerpBicycle/gil-mcp-bridge#v0.2.0
 ```
 
 Or clone + install:
@@ -40,7 +42,7 @@ Two options:
 ### OAuth (recommended)
 
 ```bash
-npx github:DerpBicycle/gil-mcp-bridge login
+npx --yes --allow-git=root github:DerpBicycle/gil-mcp-bridge login
 ```
 
 This opens your browser, registers a client via DCR, walks you through the consent screen, and stores tokens at `~/.gil/credentials.json` (mode 0600, user-only). Access tokens last an hour and are refreshed automatically; the session stays valid for 30 days unless you revoke it from `/account → Connected Apps` or run `logout`.
@@ -48,7 +50,7 @@ This opens your browser, registers a client via DCR, walks you through the conse
 ### API key
 
 ```bash
-GIL_API_KEY=gil_xxx npx github:DerpBicycle/gil-mcp-bridge
+GIL_API_KEY=gil_xxx npx --yes --allow-git=root github:DerpBicycle/gil-mcp-bridge
 ```
 
 Create a key at [/help/mcp-server](https://gameindustrylibrary.com/help/mcp-server) (signed in, with Pro). Keys don't expire but you can revoke them from the same page.
@@ -64,17 +66,17 @@ Open Settings → Developer → Edit Config (`claude_desktop_config.json`) and a
   "mcpServers": {
     "game-industry-library": {
       "command": "npx",
-      "args": ["github:DerpBicycle/gil-mcp-bridge"]
+      "args": ["--yes", "--allow-git=root", "github:DerpBicycle/gil-mcp-bridge"]
     }
   }
 }
 ```
 
-Restart Claude Desktop. On first run, the bridge prints a "no credentials" error — run `npx github:DerpBicycle/gil-mcp-bridge login` once in a terminal to sign in.
+Restart Claude Desktop. On first run, the bridge prints a "no credentials" error — run `npx --yes --allow-git=root github:DerpBicycle/gil-mcp-bridge login` once in a terminal to sign in.
 
 ### Cline / Continue / other stdio clients
 
-Same config — point the client at `npx github:DerpBicycle/gil-mcp-bridge` as the command.
+Same config — point the client at `npx --yes --allow-git=root github:DerpBicycle/gil-mcp-bridge` as the command.
 
 ### Custom
 
